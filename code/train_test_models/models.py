@@ -3,6 +3,7 @@ from utils import *
 
 
 def conv_block(inputs, n_filter, regularizer, common_args):
+    # 3層のConv2D（ReLU活性化） + MaxPooling
     x = tf.keras.layers.Conv2D(filters=n_filter,
                                kernel_size=3,
                                strides=1,
@@ -29,6 +30,7 @@ def conv_block(inputs, n_filter, regularizer, common_args):
 
 
 def dense_block(inputs, n_filter, regularizer, drop_rate, common_args):
+    # Dense層（Dropout付き）を3層構成
     x = tf.keras.layers.Dense(16 * n_filter,
                               activation='relu',
                               kernel_regularizer=regularizer,
@@ -46,16 +48,20 @@ def dense_block(inputs, n_filter, regularizer, drop_rate, common_args):
 
 
 def make_level_model(img_size, n_bands, l2, nf, dr, with_feature):
+    # モデル初期設定
     regularizer = tf.keras.regularizers.l2(l2)
     initializer = tf.keras.initializers.glorot_normal()
     common_args = {"kernel_initializer": initializer}
 
+    # 入力層（画像）
     inputs = tf.keras.layers.Input(shape=(img_size, img_size, n_bands))
     x = conv_block(inputs, nf, regularizer, common_args)
     x = conv_block(x, nf * 2, regularizer, common_args)
     x = conv_block(x, nf * 4, regularizer, common_args)
 
     x = tf.keras.layers.Flatten()(x)
+    
+    # 補助特徴量ありの場合（例: 社会統計データ）
     if with_feature:
         inputs_features = tf.keras.Input(shape=(34,))
         x = tf.keras.layers.concatenate([x, inputs_features])
@@ -71,6 +77,7 @@ def make_level_model(img_size, n_bands, l2, nf, dr, with_feature):
 
 
 def make_diff_model(img_size, n_bands, l2, nf, dr, with_feature, model):
+    # 入力：2つの画像（変化検出用途）
     regularizer = tf.keras.regularizers.l2(l2)
     initializer = tf.keras.initializers.glorot_normal()
     common_args = {"kernel_initializer": initializer}
@@ -78,6 +85,7 @@ def make_diff_model(img_size, n_bands, l2, nf, dr, with_feature, model):
     inputs1 = tf.keras.layers.Input(shape=(img_size, img_size, n_bands))
     inputs2 = tf.keras.layers.Input(shape=(img_size, img_size, n_bands))
 
+    # 特徴量ありの場合、既存のlevelモデルからfeature抽出までの中間出力を使う
     if with_feature:
         inputs_features = tf.keras.Input(shape=(34,))
         level_model = tf.keras.Model(model.input, outputs=model.get_layer('concatenate').output)
@@ -103,12 +111,14 @@ def make_diff_model(img_size, n_bands, l2, nf, dr, with_feature, model):
 
 
 def train_test_model(hparams, model, train_ds, valid_ds, test_ds, logdir, checkdir, epochs):
+    # ハイパーパラメータの読み取り
     l2 = hparams['l2']
     lr = hparams['lr']
     bs = hparams['bs']
     ds = hparams['ds']
     nf = hparams['nf']
     dr = hparams['dr']
+    # 学習率スケジュール（逆数減衰）
     lr_schedule = tf.keras.optimizers.schedules.InverseTimeDecay(
         lr,
         decay_steps=int(ds_len(train_ds)) * ds,
@@ -116,6 +126,8 @@ def train_test_model(hparams, model, train_ds, valid_ds, test_ds, logdir, checkd
         staircase=True)
     optimizer = tf.keras.optimizers.Adam(lr_schedule)
     model.compile(optimizer=optimizer, loss="mean_squared_error", metrics=[RSquare()])
+    
+    # モデル学習（コールバックでTensorBoard/Checkpoint/EarlyStopping）
     model.fit(
         train_ds,
         epochs=epochs,
@@ -130,6 +142,8 @@ def train_test_model(hparams, model, train_ds, valid_ds, test_ds, logdir, checkd
                                                     mode='max')]
     )
     model.load_weights(checkdir + '/{}_{}_{}_{}_{}_{}'.format(lr, l2, bs, ds, nf, dr))
+    
+    # 検証＆テストスコア出力（R²）
     _, valid_accuracy = model.evaluate(valid_ds)
     _, test_accuracy = model.evaluate(test_ds)
     return valid_accuracy, test_accuracy
@@ -137,7 +151,7 @@ def train_test_model(hparams, model, train_ds, valid_ds, test_ds, logdir, checkd
 
 def run(run_dir, hparams, model, train_ds, valid_ds, test_ds, logdir, checkdir, epochs):
     with tf.summary.create_file_writer(run_dir).as_default():
-        hp.hparams(hparams)
+        hp.hparams(hparams) # ハイパーパラメータの記録
         valid_accuracy, test_accuracy = train_test_model(hparams, model, train_ds,
                                                          valid_ds, test_ds, logdir,
                                                          checkdir, epochs)
