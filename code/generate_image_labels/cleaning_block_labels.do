@@ -1,4 +1,5 @@
-
+#各年のブロックレベル（またはブロックグループ・郡レベル）での 人口統計情報、収入、雇用情報、インフレ調整、地域面積、夜間光データなどを結合・標準化 し、
+#機械学習や地理的経済分析のための高解像度ラベルファイルを作成
 
 
 clear
@@ -14,7 +15,9 @@ file close _all
 set maxvar 20000
 
 
-**** Inflation Values for adjusting income
+#インフレ係数の計算
+#各年の**CPI（消費者物価指数）**を読み込み、平均を計算
+#2012年基準での変換係数を作成（例：1999年ドル → 2012年ドル）
 
 //from https://fred.stlouisfed.org/series/CPIAUCSL
 import delimited using data\labels\source_files\CPIAUCSL.csv, clear
@@ -46,7 +49,7 @@ sum infl if y==2019
 
 
 **************    Cleaning Label Data, 2000
-
+# 2000年ブロックレベルの人口・人種・年齢・性別構成
 *bg group quarters indicator
 {
 *
@@ -438,6 +441,7 @@ rename pop pop_10
 rename pop_bg pop_bg_10
 rename pop_bg20 pop_bg_20
 
+# 2000〜2020年にわたる各種指標の統合
 merge 1:1 gisjoin using data\labels\generated_files\lodes_04_2010blocks
 drop if _merge==2
 drop _merge
@@ -451,6 +455,8 @@ save data\labels\generated_files\block_labels_7_10_15_17_20, replace
 use data\labels\generated_files\demos_inc_block_00, clear
 
 *applying crosswalk weight to 2000 blocks, to get to 2010 blocks
+# 2000ブロック → 2010ブロックへのクロスウォーク適用
+
 merge 1:m gisjoin using data\labels\source_files\nhgis_blk2000_blk2010_gj, nogen keep(match)
 drop gisjoin //this is 2000 gisjoin
 rename gjoin2010 gisjoin
@@ -488,6 +494,7 @@ merge 1:1 gisjoin using data\labels\generated_files\block_areas10, nogen keep(ma
 
 preserve
 
+# ブロックグループ内シェアや人口密度の計算
 collapse (firstnm) pop_bg_00 (sum) shape_area, by(gisjoin_bg)
 gen pd = pop / shape_area
 gen negpopd = -pd
@@ -526,6 +533,7 @@ foreach v in pop_00 pop_10 inc_00 inc_10 {
 	replace `v' = exp(`v')
 }
 
+# 郡単位への集計
 collapse (sum) block_area pop_00 pop_10 inc_00 inc_10, by(gisjoin_cnty)
 
 rename block_area cnty_area
