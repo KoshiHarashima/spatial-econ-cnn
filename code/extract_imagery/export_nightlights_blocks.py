@@ -8,6 +8,11 @@
    python ".../export_mw_highres_imagery.py"
 """
 #アメリカの国勢調査ブロック単位で、2000年・2010年の夜間光強度の合計を人口規模別に集計・エクスポートする処理
+
+#アメリカの州別・ブロック別・人口帯別に、DMSP-OLS 夜間光（2000年/2010年）の合計値を集計
+#Google Drive に CSV 形式で保存
+#都市化の進行や人口密度との関連を後から分析するための前処理データとして使用
+
 import ee
 ee.Initialize() # Earth Engine API を初期化
 
