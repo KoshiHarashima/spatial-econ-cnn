@@ -1,22 +1,25 @@
-""" to run this script, open the command prompt, type:
-#Create a google earth engine acocunt,  then follow the google earth engine instructions to first create an appropriate python environment for extraction (ee)
-conda activate ee
-#enter the filepath of this file on your system below
-python ".../export_large_landsat_imagery.py"
+"""
+このスクリプトを実行するには、以下の手順に従ってください:
+
+1. Google Earth Engine アカウントを作成
+2. GEE の Python 環境をセットアップ（例: `conda activate ee`）
+3. コマンドプロンプトからこのスクリプトを実行
+   例: python ".../export_large_landsat_imagery.py"
 """
 
+# Earth Engine API を初期化
 import ee
 ee.Initialize()
 
-#This function selects images within a year which are not impacted by clouds
+# Landsat 4/5/7 画像から雲の影響を除去するためのマスク関数
 def cloudMaskL457(image): 
-  qa = image.select('pixel_qa')
+  qa = image.select('pixel_qa')  # 品質評価バンド
   cloud = qa.bitwiseAnd(1 << 5).And(qa.bitwiseAnd(1 << 7)).Or(qa.bitwiseAnd(1 << 3))
   mask2 = image.mask().reduce(ee.Reducer.min())
-  return(image.updateMask(cloud.Not()).updateMask(mask2))
+  return image.updateMask(cloud.Not()).updateMask(mask2)
 
-
-#Each command below creates an annual cloud-free summer composite (median) of landsat 7 surface reflectance imagery
+# 各年の夏（5月～8月）の雲の少ない Landsat 7 画像の中央値を合成（クラウドフリーコンポジット）
+# 各バンドはわかりやすい名前にリネーム（例: B3 → red_0）
 ls0 = ee.ImageCollection("LANDSAT/LE07/C01/T1_SR").filterDate(ee.DateRange('2000-05-01', '2000-08-30')).map(cloudMaskL457).median().select(['B3','B2','B1','B4','B5','B6','B7'],['red_0','green_0','blue_0','B4_0','B5_0','B6_0','B7_0']) 
 ls1 = ee.ImageCollection("LANDSAT/LE07/C01/T1_SR").filterDate(ee.DateRange('2001-05-01', '2001-08-30')).map(cloudMaskL457).median().select(['B3','B2','B1','B4','B5','B6','B7'],['red_1','green_1','blue_1','B4_1','B5_1','B6_1','B7_1']) 
 ls2 = ee.ImageCollection("LANDSAT/LE07/C01/T1_SR").filterDate(ee.DateRange('2002-05-01', '2002-08-30')).map(cloudMaskL457).median().select(['B3','B2','B1','B4','B5','B6','B7'],['red_2','green_2','blue_2','B4_2','B5_2','B6_2','B7_2']) 
@@ -39,11 +42,12 @@ ls18 = ee.ImageCollection("LANDSAT/LE07/C01/T1_SR").filterDate(ee.DateRange('201
 ls19 = ee.ImageCollection("LANDSAT/LE07/C01/T1_SR").filterDate(ee.DateRange('2019-05-01', '2019-08-30')).map(cloudMaskL457).median().select(['B3','B2','B1','B4','B5','B6','B7'],['red_19','green_19','blue_19','B4_19','B5_19','B6_19','B7_19'])
 
 
-#The following commands create annual nightlight bands for comparison
+# 夜間光データの読み込み（複数の出典、年ごとに異なる）
 dmsp_bluhm00 = ee.Image('users/armanucsd/F142000_Corrected').select(['b1'],['nl_bluhm_0'])
 dmsp_bluhm10 = ee.Image('users/armanucsd/F182010_Corrected').select(['b1'],['nl_bluhm_10'])
 dmsp_cal00 = ee.Image('NOAA/DMSP-OLS/CALIBRATED_LIGHTS_V4/F12-F15_20000103-20001229_V4').select(['avg_vis'],['nl_cal_0'])
 dmsp_cal10 = ee.Image('NOAA/DMSP-OLS/CALIBRATED_LIGHTS_V4/F16_20100111-20101209_V4').select(['avg_vis'],['nl_cal_10'])
+# 2000年〜2013年までの標準夜間光データ
 dmsp_00 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F152000').select(['avg_vis'],['nl_0'])
 dmsp_01 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F152001').select(['avg_vis'],['nl_1'])
 dmsp_02 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F152002').select(['avg_vis'],['nl_2'])
@@ -58,6 +62,7 @@ dmsp_10 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F182010').select(['avg_vis'],
 dmsp_11 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F182011').select(['avg_vis'],['nl_11'])
 dmsp_12 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F182012').select(['avg_vis'],['nl_12'])
 dmsp_13 = ee.Image('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS/F182013').select(['avg_vis'],['nl_13'])
+# 2014年〜2019年のVIIRS夜間光データ（年ごとに中央値を使用）
 viirs_14 = ee.ImageCollection('NOAA/VIIRS/DNB/MONTHLY_V1/VCMCFG').filter(ee.Filter.date('2014-01-01', '2015-01-01')).select(['avg_rad'],['nl_14']).median()
 viirs_15 = ee.ImageCollection('NOAA/VIIRS/DNB/MONTHLY_V1/VCMCFG').filter(ee.Filter.date('2015-01-01', '2016-01-01')).select(['avg_rad'],['nl_15']).median()
 viirs_16 = ee.ImageCollection('NOAA/VIIRS/DNB/MONTHLY_V1/VCMCFG').filter(ee.Filter.date('2016-01-01', '2017-01-01')).select(['avg_rad'],['nl_16']).median()
@@ -65,21 +70,21 @@ viirs_17 = ee.ImageCollection('NOAA/VIIRS/DNB/MONTHLY_V1/VCMCFG').filter(ee.Filt
 viirs_18 = ee.ImageCollection('NOAA/VIIRS/DNB/MONTHLY_V1/VCMCFG').filter(ee.Filter.date('2018-01-01', '2019-01-01')).select(['avg_rad'],['nl_18']).median()
 viirs_19 = ee.ImageCollection('NOAA/VIIRS/DNB/MONTHLY_V1/VCMCFG').filter(ee.Filter.date('2019-01-01', '2020-01-01')).select(['avg_rad'],['nl_19']).median()
 
-#Land cover bands are also included for potential evaluation purposes
+# 土地被覆（Land Cover）データの読み込み（NLCD）
 nlcd_00= ee.Image("USGS/NLCD/NLCD2001").select(['landcover'],['lc_0'])
 nlcd_10= ee.Image("USGS/NLCD/NLCD2011").select(['landcover'],['lc_10'])
 nlcd_16= ee.Image("USGS/NLCD/NLCD2016").select(['landcover'],['lc_16'])
 
-#This band incorporates information about the population density to use for an "urban" inclusion threshold in the analysis
+# 人口密度から作成された都市バッファ領域（都市判定マスク）を読み込み
 urban = ee.Image("users/armanucsd/national_bg_urban_buffer1mile").select(['first'], ['urban'])
 
-#Here we combine all of these bands into a single variable (image)
+# 全てのバンド（Landsat, 夜間光, 土地被覆, 都市判定, 緯度経度）を1つの画像として統合
 allbands =  ls0.addBands(ls1).addBands(ls2).addBands(ls3).addBands(ls4).addBands(ls5).addBands(ls6).addBands(ls7).addBands(ls8).addBands(ls9).addBands(ls10).addBands(ls11).addBands(ls12).addBands(ls13).addBands(ls14).addBands(ls15).addBands(ls16).addBands(ls17).addBands(ls18).addBands(ls19).addBands(ee.Image.pixelLonLat()).addBands(urban).addBands(ee.Image.pixelLonLat()).addBands(urban).addBands(dmsp_bluhm00).addBands(dmsp_bluhm10).addBands(dmsp_cal00).addBands(dmsp_cal10).addBands(dmsp_00).addBands(dmsp_01).addBands(dmsp_02).addBands(dmsp_03).addBands(dmsp_04).addBands(dmsp_05).addBands(dmsp_06).addBands(dmsp_07).addBands(dmsp_08).addBands(dmsp_09).addBands(dmsp_10).addBands(dmsp_11).addBands(dmsp_12).addBands(dmsp_13).addBands(viirs_14).addBands(viirs_15).addBands(viirs_16).addBands(viirs_17).addBands(viirs_18).addBands(viirs_19).addBands(nlcd_00).addBands(nlcd_10).addBands(nlcd_16)
 
-#These are the urban areas in which we extract images, these also designate the train/validation/test subsets for our primary analysis
+# 都市領域の定義（blobs = 分割された都市ポリゴン）
 blobs = ee.FeatureCollection("users/armanucsd/popdbuff_splitblobs_national")
 
-#This function extraction TFR imagery over each urban "blob" for our 80x80 pixel images, labelled "large" in our paper
+# 各都市エリア（blob）に対して、80x80ピクセルの領域を指定し、TFRecord形式でエクスポート
 def outfeat(fnum):
   fnumstr=str(fnum)
   descrip = 'blobs_papi_national' + fnumstr
@@ -104,9 +109,8 @@ def outfeat(fnum):
   task.start()
 
 
-
-#The below command runs the above function over each of the urban areas iteratively, the last time we ran this it took about a week to run on GEE
-
+# 都市領域（blobs）をループで一括エクスポート（時間がかかる処理）
+# 前回実行では4分割して1週間程度かかったとのこと
 #Full range of urban areas (blobs): 0 to 4785
 
 #run 1: 0, 1500
@@ -115,5 +119,4 @@ def outfeat(fnum):
 #run 4: 4000, 4786
 for i in range(0,1500):
   outfeat(i)
-
-
+  
